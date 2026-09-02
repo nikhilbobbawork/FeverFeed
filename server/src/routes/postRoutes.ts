@@ -1,0 +1,23 @@
+import { Router } from "express";
+import {
+  handleGetPosts,
+  handleGetPostById,
+  handleCreatePost,
+  handleUpdatePost,
+  handleDeletePost,
+} from "../controllers/postController.js";
+import { verifyToken } from "../middleware/auth.js";
+import { upload } from "../middleware/upload.js";
+
+const router = Router();
+
+// Public routes
+router.get("/", handleGetPosts);
+router.get("/:id", handleGetPostById);
+
+// Protected routes (Requires Auth + File Upload support)
+router.post("/", verifyToken, upload.single("image"), handleCreatePost);
+router.put("/:id", verifyToken, upload.single("image"), handleUpdatePost);
+router.delete("/:id", verifyToken, handleDeletePost);
+
+export default router;

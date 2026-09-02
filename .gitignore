@@ -1,0 +1,14 @@
+# Dependencies
+**/node_modules/
+
+# Environment variables
+**/.env
+**/.env.local
+
+# Build outputs
+**/dist/
+**/build/
+
+# Uploaded media (Server)
+server/uploads/*
+!server/uploads/.gitkeep
