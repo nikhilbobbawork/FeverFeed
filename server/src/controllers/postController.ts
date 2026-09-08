@@ -64,12 +64,16 @@ export const handleCreatePost = async (
       : null;
 
     const db = await connectToDatabase();
+    const userId = req.user?.id;
+
     const newPost = {
       title,
       content,
       imageUrl,
-      authorId: req.user?.id,
+      authorId: userId,
       authorEmail: req.user?.email,
+      upvotes: [],
+      upvoteCount: 0,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -94,6 +98,7 @@ export const handleUpdatePost = async (
   try {
     const { id } = req.params;
     const { title, content } = req.body;
+    const userId = req.user?.id;
 
     if (typeof id !== "string" || !ObjectId.isValid(id)) {
       res.status(400).json({ error: "Invalid post ID format" });
@@ -112,7 +117,7 @@ export const handleUpdatePost = async (
       return;
     }
 
-    if (existingPost.authorId !== req.user?.id) {
+    if (existingPost.authorId !== userId) {
       res.status(403).json({ error: "Unauthorized to edit this post" });
       return;
     }
@@ -144,6 +149,7 @@ export const handleDeletePost = async (
 ) => {
   try {
     const { id } = req.params;
+    const userId = req.user?.id;
 
     if (typeof id !== "string" || !ObjectId.isValid(id)) {
       res.status(400).json({ error: "Invalid post ID format" });
@@ -162,7 +168,7 @@ export const handleDeletePost = async (
       return;
     }
 
-    if (existingPost.authorId !== req.user?.id) {
+    if (existingPost.authorId !== userId) {
       res.status(403).json({ error: "Unauthorized to delete this post" });
       return;
     }
@@ -172,6 +178,60 @@ export const handleDeletePost = async (
     res.status(200).json({ message: "Post deleted successfully" });
   } catch (error) {
     console.error("Error deleting post:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Toggle Upvote on Post (Protected)
+export const handleToggleUpvote = async (
+  req: AuthenticatedRequest,
+  res: Parameters<RequestHandler>[1]
+) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    if (typeof id !== "string" || !ObjectId.isValid(id)) {
+      res.status(400).json({ error: "Invalid post ID format" });
+      return;
+    }
+
+    const db = await connectToDatabase();
+    const postsCollection = db.collection("posts");
+
+    const post = await postsCollection.findOne({ _id: new ObjectId(id) });
+
+    if (!post) {
+      res.status(404).json({ error: "Post not found" });
+      return;
+    }
+
+    const upvotes: string[] = post.upvotes || [];
+    const hasUpvoted = upvotes.includes(userId);
+
+    const updateQuery = hasUpvoted
+      ? { $pull: { upvotes: userId }, $inc: { upvoteCount: -1 } }
+      : { $addToSet: { upvotes: userId }, $inc: { upvoteCount: 1 } };
+
+    await postsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      updateQuery as any
+    );
+
+    const updatedPost = await postsCollection.findOne({ _id: new ObjectId(id) });
+
+    res.status(200).json({
+      success: true,
+      upvoteCount: updatedPost?.upvoteCount ?? 0,
+      hasUpvoted: !hasUpvoted,
+    });
+  } catch (error) {
+    console.error("Error toggling upvote:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };

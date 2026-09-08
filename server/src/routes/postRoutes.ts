@@ -5,6 +5,7 @@ import {
   handleCreatePost,
   handleUpdatePost,
   handleDeletePost,
+  handleToggleUpvote
 } from "../controllers/postController.js";
 import { verifyToken } from "../middleware/auth.js";
 import { upload } from "../middleware/upload.js";
@@ -19,5 +20,7 @@ router.get("/:id", handleGetPostById);
 router.post("/", verifyToken, upload.single("image"), handleCreatePost);
 router.put("/:id", verifyToken, upload.single("image"), handleUpdatePost);
 router.delete("/:id", verifyToken, handleDeletePost);
+
+router.post('/:id/upvote', verifyToken, handleToggleUpvote);
 
 export default router;

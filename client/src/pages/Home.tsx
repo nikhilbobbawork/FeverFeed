@@ -12,11 +12,14 @@ interface Post {
   authorEmail: string;
   createdAt: string;
   imageUrl?: string;
+  upvotes?: string[];
+  upvoteCount?: number;
 }
 
 interface User {
   username: string;
   id?: string;
+  _id?: string;
 }
 
 export default function Home() {
@@ -25,10 +28,10 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
-  
+
   // Auth & Ownership state
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  
+
   // Edit Modal State
   const [editingPost, setEditingPost] = useState<Post | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
@@ -117,6 +120,69 @@ export default function Home() {
     }
   };
 
+  const handleToggleUpvote = async (postId: string) => {
+    if (!currentUser) {
+      alert("Please log in to upvote posts.");
+      return;
+    }
+
+    const userId = currentUser.id || currentUser._id;
+    if (!userId) return;
+
+    // Optimistic UI update
+    setPosts((prevPosts) =>
+      prevPosts.map((post) => {
+        if (post._id !== postId) return post;
+
+        const currentUpvotes = post.upvotes || [];
+        const hasUpvoted = currentUpvotes.includes(userId);
+
+        const newUpvotes = hasUpvoted
+          ? currentUpvotes.filter((id) => id !== userId)
+          : [...currentUpvotes, userId];
+
+        const newCount = hasUpvoted
+          ? (post.upvoteCount || 1) - 1
+          : (post.upvoteCount || 0) + 1;
+
+        return {
+          ...post,
+          upvotes: newUpvotes,
+          upvoteCount: newCount,
+        };
+      })
+    );
+
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/posts/${postId}/upvote`,
+        {
+          method: "POST",
+          credentials: "include",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to toggle upvote");
+      }
+
+      const data = await response.json();
+
+      // Sync with server state
+      setPosts((prevPosts) =>
+        prevPosts.map((post) =>
+          post._id === postId
+            ? { ...post, upvoteCount: data.upvoteCount }
+            : post
+        )
+      );
+    } catch (err) {
+      console.error("Error toggling upvote:", err);
+      // Revert via refresh if server sync fails
+      setRefreshTrigger((prev) => prev + 1);
+    }
+  };
+
   const getImageUrl = (path: string) => {
     if (path.startsWith("http://") || path.startsWith("https://")) {
       return path;
@@ -166,16 +232,18 @@ export default function Home() {
         ) : (
           <div className="columns is-multiline">
             {posts.map((post) => {
-              // Checks if currently logged-in user owns this post
               const isOwner = currentUser?.username === post.authorEmail;
+              const userId = currentUser?.id || currentUser?._id;
+              const hasUpvoted =
+                !!userId && (post.upvotes || []).includes(userId);
 
               return (
                 <div className="column is-12" key={post._id}>
                   <div className="card">
                     <header className="card-header is-align-items-center pr-3">
                       <p className="card-header-title">{post.title}</p>
-                      
-                      {/* Only render action controls if user owns the post */}
+
+                      {/* Action controls for owner */}
                       {isOwner && (
                         <div className="buttons are-small mb-0">
                           <button
@@ -214,6 +282,18 @@ export default function Home() {
                         {new Date(post.createdAt).toLocaleDateString()}
                       </small>
                     </div>
+
+                    <footer className="card-footer px-4 py-2 is-align-items-center">
+                      <button
+                        className={`button is-small ${
+                          hasUpvoted ? "is-danger" : "is-light"
+                        }`}
+                        onClick={() => handleToggleUpvote(post._id)}
+                      >
+                        <span className="icon is-small mr-1">▲</span>
+                        <span>{post.upvoteCount || 0} Upvotes</span>
+                      </button>
+                    </footer>
                   </div>
                 </div>
               );
