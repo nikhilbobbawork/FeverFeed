@@ -4,6 +4,7 @@ import Hero from "../components/Hero";
 import Footer from "../components/Footer";
 import CreatePostModal from "../components/CreatePostModal";
 import EditPostModal from "../components/EditPostModal";
+import CommentSection from "../components/CommentSection";
 
 interface Post {
   _id: string;
@@ -281,6 +282,12 @@ export default function Home() {
                       <small className="has-text-grey">
                         {new Date(post.createdAt).toLocaleDateString()}
                       </small>
+
+                      {/* Embedded Comment Section */}
+                      <CommentSection
+                        postId={post._id}
+                        currentUser={currentUser}
+                      />
                     </div>
 
                     <footer className="card-footer px-4 py-2 is-align-items-center">

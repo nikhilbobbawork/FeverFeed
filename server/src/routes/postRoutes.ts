@@ -5,8 +5,12 @@ import {
   handleCreatePost,
   handleUpdatePost,
   handleDeletePost,
-  handleToggleUpvote
+  handleToggleUpvote,
 } from "../controllers/postController.js";
+import {
+  handleGetComments,
+  handleCreateComment,
+} from "../controllers/commentController.js";
 import { verifyToken } from "../middleware/auth.js";
 import { upload } from "../middleware/upload.js";
 
@@ -21,6 +25,8 @@ router.post("/", verifyToken, upload.single("image"), handleCreatePost);
 router.put("/:id", verifyToken, upload.single("image"), handleUpdatePost);
 router.delete("/:id", verifyToken, handleDeletePost);
 
-router.post('/:id/upvote', verifyToken, handleToggleUpvote);
+router.post("/:id/upvote", verifyToken, handleToggleUpvote);
+router.get("/:postId/comments", handleGetComments);
+router.post("/:postId/comments", verifyToken, handleCreateComment);
 
 export default router;
