@@ -10,6 +10,7 @@ import {
 import {
   handleGetComments,
   handleCreateComment,
+  handleDeleteComment,
 } from "../controllers/commentController.js";
 import { verifyToken } from "../middleware/auth.js";
 import { upload } from "../middleware/upload.js";
@@ -28,5 +29,6 @@ router.delete("/:id", verifyToken, handleDeletePost);
 router.post("/:id/upvote", verifyToken, handleToggleUpvote);
 router.get("/:postId/comments", handleGetComments);
 router.post("/:postId/comments", verifyToken, handleCreateComment);
+router.delete("/comments/:commentId", verifyToken, handleDeleteComment);
 
 export default router;

@@ -34,7 +34,7 @@ export const handleGetComments: RequestHandler = async (req, res) => {
 // Add Comment to Post (Protected)
 export const handleCreateComment = async (
   req: AuthenticatedRequest,
-  res: Parameters<RequestHandler>[1]
+  res: Parameters<RequestHandler>[1],
 ) => {
   try {
     const { postId } = req.params;
@@ -69,6 +69,66 @@ export const handleCreateComment = async (
     });
   } catch (error) {
     console.error("Error creating comment:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// controllers/commentController.ts
+
+export const handleDeleteComment = async (
+  req: AuthenticatedRequest,
+  res: Parameters<RequestHandler>[1],
+) => {
+  try {
+    const userId = req.user?.id;
+
+    const commentIdParam = req.params.commentId;
+    const commentId = Array.isArray(commentIdParam)
+      ? commentIdParam[0]
+      : commentIdParam;
+
+    if (!commentId || !ObjectId.isValid(commentId)) {
+      res.status(400).json({ error: "Invalid comment ID" });
+      return;
+    }
+
+    const objectId = new ObjectId(commentId);
+
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    if (!commentId || !ObjectId.isValid(commentId)) {
+      res.status(400).json({ error: "Invalid comment ID" });
+      return;
+    }
+
+    const db = await connectToDatabase();
+    const comment = await db
+      .collection("comments")
+      .findOne({ _id: new ObjectId(commentId) });
+
+    if (!comment) {
+      res.status(404).json({ error: "Comment not found" });
+      return;
+    }
+
+    // Ownership check
+    if (comment.authorId !== userId) {
+      res
+        .status(403)
+        .json({ error: "Forbidden: You can only delete your own comments" });
+      return;
+    }
+
+    await db.collection("comments").deleteOne({ _id: new ObjectId(commentId) });
+
+    res
+      .status(200)
+      .json({ success: true, message: "Comment deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting comment:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
