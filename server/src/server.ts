@@ -8,6 +8,7 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import authRoutes from "./routes/authRoutes.js";
 import postRoutes from "./routes/postRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,6 +43,7 @@ app.use("/uploads", express.static(uploadsDir)); // Mount uploads directory
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/posts", postRoutes);
+app.use("/api/users", userRoutes);
 
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017";
