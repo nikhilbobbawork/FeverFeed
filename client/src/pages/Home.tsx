@@ -30,6 +30,9 @@ export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
+  // Sorting state: "latest" or "top"
+  const [sortBy, setSortBy] = useState<"latest" | "top">("latest");
+
   // Auth & Ownership state
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
@@ -37,11 +40,9 @@ export default function Home() {
   const [editingPost, setEditingPost] = useState<Post | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
 
-  // Check authentication status and store user info
+  // Check authentication status
   useEffect(() => {
-    fetch("http://localhost:5000/api/auth/me", {
-      credentials: "include",
-    })
+    fetch("http://localhost:5000/api/auth/me", { credentials: "include" })
       .then((res) => {
         if (!res.ok) throw new Error("Not authenticated");
         return res.json();
@@ -53,14 +54,14 @@ export default function Home() {
           setCurrentUser(null);
         }
       })
-      .catch(() => {
-        setCurrentUser(null);
-      });
+      .catch(() => setCurrentUser(null));
   }, []);
 
-  // Fetch posts
+  // Fetch posts when refreshTrigger or sortBy changes
   useEffect(() => {
-    fetch("http://localhost:5000/api/posts", {
+    let isMounted = true;
+
+    fetch(`http://localhost:5000/api/posts?sort=${sortBy}`, {
       credentials: "include",
     })
       .then((res) => {
@@ -68,6 +69,7 @@ export default function Home() {
         return res.json();
       })
       .then((data) => {
+        if (!isMounted) return;
         const postsData = Array.isArray(data)
           ? data
           : data.posts || data.data || [];
@@ -75,11 +77,23 @@ export default function Home() {
         setLoading(false);
       })
       .catch((err) => {
+        if (!isMounted) return;
         console.error("Failed to fetch posts:", err);
         setError("Could not load discussions.");
         setLoading(false);
       });
-  }, [refreshTrigger]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [refreshTrigger, sortBy]);
+
+  const handleSortChange = (newSort: "latest" | "top") => {
+    if (newSort !== sortBy) {
+      setLoading(true);
+      setSortBy(newSort);
+    }
+  };
 
   const handlePostCreated = () => {
     setLoading(true);
@@ -99,9 +113,7 @@ export default function Home() {
   };
 
   const handleDeletePost = async (postId: string) => {
-    if (!window.confirm("Are you sure you want to delete this discussion?")) {
-      return;
-    }
+    if (!window.confirm("Are you sure you want to delete this discussion?")) return;
 
     try {
       const response = await fetch(`http://localhost:5000/api/posts/${postId}`, {
@@ -163,13 +175,10 @@ export default function Home() {
         }
       );
 
-      if (!response.ok) {
-        throw new Error("Failed to toggle upvote");
-      }
+      if (!response.ok) throw new Error("Failed to toggle upvote");
 
       const data = await response.json();
 
-      // Sync with server state
       setPosts((prevPosts) =>
         prevPosts.map((post) =>
           post._id === postId
@@ -179,15 +188,12 @@ export default function Home() {
       );
     } catch (err) {
       console.error("Error toggling upvote:", err);
-      // Revert via refresh if server sync fails
       setRefreshTrigger((prev) => prev + 1);
     }
   };
 
   const getImageUrl = (path: string) => {
-    if (path.startsWith("http://") || path.startsWith("https://")) {
-      return path;
-    }
+    if (path.startsWith("http://") || path.startsWith("https://")) return path;
     const cleanPath = path.startsWith("/") ? path : `/${path}`;
     return `http://localhost:5000${cleanPath}`;
   };
@@ -206,7 +212,7 @@ export default function Home() {
       </div>
       <div className="container section">
         <div className="is-flex is-justify-content-space-between is-align-items-center mb-4">
-          <h2 className="title is-4 mb-0">Latest Discussions</h2>
+          <h2 className="title is-4 mb-0">Discussions</h2>
           {currentUser && (
             <button
               className="button is-danger"
@@ -217,8 +223,24 @@ export default function Home() {
           )}
         </div>
 
+        {/* Bulma Sorting Tabs */}
+        <div className="tabs is-boxed mb-5">
+          <ul>
+            <li className={sortBy === "latest" ? "is-active" : ""}>
+              <a onClick={() => handleSortChange("latest")}>
+                <span>Latest</span>
+              </a>
+            </li>
+            <li className={sortBy === "top" ? "is-active" : ""}>
+              <a onClick={() => handleSortChange("top")}>
+                <span>Top (Most Upvoted)</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+
         {loading ? (
-          <p>Loading posts...</p>
+          <p>Loading discussions...</p>
         ) : error ? (
           <div className="notification is-danger is-light">
             <p>{error}</p>
@@ -243,8 +265,6 @@ export default function Home() {
                   <div className="card">
                     <header className="card-header is-align-items-center pr-3">
                       <p className="card-header-title">{post.title}</p>
-
-                      {/* Action controls for owner */}
                       {isOwner && (
                         <div className="buttons are-small mb-0">
                           <button
@@ -283,7 +303,6 @@ export default function Home() {
                         {new Date(post.createdAt).toLocaleDateString()}
                       </small>
 
-                      {/* Embedded Comment Section */}
                       <CommentSection
                         postId={post._id}
                         currentUser={currentUser}

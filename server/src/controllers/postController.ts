@@ -4,19 +4,30 @@ import { connectToDatabase } from "../server.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 
 // Get All Posts (Public)
-export const handleGetPosts: RequestHandler = async (_req, res) => {
+export const handleGetPosts: RequestHandler = async (req, res) => {
   try {
+    const { sort } = req.query;
     const db = await connectToDatabase();
-    const posts = await db
-      .collection("posts")
-      .find()
-      .sort({ createdAt: -1 })
-      .toArray();
+    const postsCollection = db.collection("posts");
 
-    res.status(200).json({ success: true, posts });
+    // Determine sort strategy (Default to latest)
+    let sortOption: { [key: string]: 1 | -1 } = { createdAt: -1 };
+
+    if (sort === "top") {
+      sortOption = { upvoteCount: -1, createdAt: -1 };
+    } else {
+      sortOption = { createdAt: -1 };
+    }
+
+    const posts = await postsCollection.find({}).sort(sortOption).toArray();
+
+    res.status(200).json({
+      success: true,
+      posts,
+    });
   } catch (error) {
     console.error("Error fetching posts:", error);
-    res.status(500).json({ error: "Failed to retrieve posts" });
+    res.status(500).json({ success: false, error: "Failed to fetch posts." });
   }
 };
 
