@@ -2,8 +2,11 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import SignupModal from "./SignupModal";
 import LoginModal from "./LoginModal";
+import { NotificationBell } from "./NotificationBell";
 
 interface User {
+  id: string;
+  _id?: string;
   username: string;
   email?: string;
 }
@@ -15,7 +18,6 @@ export default function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Verify authentication status and load user details via the HTTP-only cookie
   useEffect(() => {
     fetch("http://localhost:5000/api/auth/me", {
       credentials: "include",
@@ -25,13 +27,18 @@ export default function Navbar() {
         throw new Error("Not authenticated");
       })
       .then((data) => {
-        // /api/auth/me returns { user: { id, email } }
         const userObj = data.user || data;
+        const userId = userObj._id || userObj.id;
         const userIdentifier = userObj.username || userObj.email;
 
-        if (userIdentifier) {
+        if (userId) {
           setIsLoggedIn(true);
-          setCurrentUser({ username: userIdentifier });
+          setCurrentUser({
+            id: String(userId),
+            _id: String(userId),
+            username: userIdentifier,
+            email: userObj.email,
+          });
         }
       })
       .catch(() => {
@@ -99,6 +106,11 @@ export default function Navbar() {
           </div>
 
           <div className="navbar-end">
+            {currentUser && (
+              <div className="navbar-item">
+                <NotificationBell currentUserId={currentUser.id || currentUser._id} />
+              </div>
+            )}
             <div className="navbar-item">
               <div className="buttons">
                 {isLoggedIn && currentUser ? (
@@ -116,10 +128,7 @@ export default function Navbar() {
                   </>
                 ) : (
                   <>
-                    <a
-                      className="button is-primary"
-                      onClick={toggleSigninModal}
-                    >
+                    <a className="button is-primary" onClick={toggleSigninModal}>
                       <strong>Sign up</strong>
                     </a>
                     <a className="button is-light" onClick={toggleLoginModal}>

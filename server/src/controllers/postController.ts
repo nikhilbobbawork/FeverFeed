@@ -1,7 +1,8 @@
 import type { RequestHandler } from "express";
 import { ObjectId } from "mongodb";
-import { connectToDatabase } from "../server.js";
+import { connectToDatabase, sendNotificationToUser } from "../server.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
+import { getNotificationCollection } from "../models/Notification.js";
 
 // Get All Posts (Public)
 export const handleGetPosts: RequestHandler = async (req, res) => {
@@ -235,6 +236,40 @@ export const handleToggleUpvote = async (
     );
 
     const updatedPost = await postsCollection.findOne({ _id: new ObjectId(id) });
+
+    // --- NOTIFICATION TRIGGER LOGIC ---
+    // Extract safe string versions of authorId and current userId to handle ObjectId vs String mismatches
+    const authorIdStr = post.authorId ? post.authorId.toString() : null;
+    const currentUserIdStr = userId.toString();
+
+    // Only notify if upvoting (not downvoting) and not upvoting own post
+    if (!hasUpvoted && authorIdStr && authorIdStr !== currentUserIdStr) {
+      const notificationsCollection = await getNotificationCollection();
+
+      const newNotification = {
+        recipientId: new ObjectId(authorIdStr),
+        senderId: new ObjectId(currentUserIdStr),
+        type: "LIKE" as const,
+        postId: new ObjectId(id),
+        isRead: false,
+        createdAt: new Date(),
+      };
+
+      const result = await notificationsCollection.insertOne(newNotification);
+
+      // Fetch sender details to send a fully populated notification payload over sockets
+      const sender = await db.collection("users").findOne(
+        { _id: new ObjectId(currentUserIdStr) },
+        { projection: { username: 1, email: 1 } }
+      );
+
+      sendNotificationToUser(authorIdStr, {
+        _id: result.insertedId.toString(),
+        ...newNotification,
+        postTitle: post.title,
+        sender: sender || { email: req.user?.email },
+      });
+    }
 
     res.status(200).json({
       success: true,
